@@ -105,9 +105,13 @@ final class GameDay {
             io.execute(() -> {
                 List<Object[]> rows = new ArrayList<>();
                 try (Cursor c = ctx.getContentResolver().query(uri, COLUMNS, null, null, null)) {
+                    // Fork casa: "headline" and "detail" are optional; a source without them reads as before.
+                    int headline = c == null ? -1 : c.getColumnIndex("headline");
+                    int detail = c == null ? -1 : c.getColumnIndex("detail");
                     while (c != null && c.moveToNext()) {
                         rows.add(new Object[] {c.getString(0), c.getString(1), c.getLong(2), c.getLong(3), c.getInt(4),
-                                c.getString(5), c.getInt(6)});
+                                c.getString(5), c.getInt(6), headline < 0 ? "" : c.getString(headline),
+                                detail < 0 ? "" : c.getString(detail)});
                     }
                 } catch (RuntimeException gone) {
                     // Uninstalled or crashed mid-query: keep what is on screen.
@@ -150,6 +154,10 @@ final class GameDay {
             String word = r[1] instanceof String ? (String) r[1] : "";
             int colour = r[4] instanceof Number ? ((Number) r[4]).intValue() : 0xFFFFFFFF;
             Turn t = new Turn((String) r[0], word, start, end, colour);
+            if (r.length > 8) {
+                t.headline = r[7] instanceof String ? (String) r[7] : "";
+                t.detail = r[8] instanceof String ? (String) r[8] : "";
+            }
             String calendar = r[5] instanceof String ? (String) r[5] : "";
             Turn first = calendar.isEmpty() ? null : byCalendar.get(calendar);
             if (first == null) {
@@ -182,6 +190,10 @@ final class GameDay {
         final boolean f1;
         /** Fork casa: the same calendar's next entries after this one, for the panel's small line. */
         final List<Turn> later = new ArrayList<>();
+        /** Fork casa: a source's own second line ("Salotto 17° · Camere 21°"), shown instead of the day and time. */
+        String headline = "";
+        /** Fork casa: a source's own small line, shown instead of the later entries. */
+        String detail = "";
 
         Turn(String topLine, String word, long startMs, long endMs, int colour) {
             this(topLine, word, startMs, endMs, colour, false);

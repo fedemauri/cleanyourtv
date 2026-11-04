@@ -128,6 +128,28 @@ public class GameDayTest {
         assertEquals(0, t.get(1).later.size());
     }
 
+    // Fork casa: game_day lists several add-ons; a source may send its own second and small lines.
+    @Test public void gameDayValueListsSeveralPackages() {
+        assertEquals(Arrays.asList("io.github.justinnewman.gameday", "io.github.maxhayim.smarthome"),
+                PanelSources.packages(" io.github.justinnewman.gameday , io.github.maxhayim.smarthome,,io.github.justinnewman.gameday"));
+        assertEquals(Collections.emptyList(), PanelSources.packages(""));
+        assertEquals(Collections.emptyList(), PanelSources.packages(null));
+    }
+
+    @Test public void aSourcesOwnLinesAreRead() {
+        List<Object[]> rows = Arrays.asList(
+                new Object[] {"Casa", "", 1000L, 9000L, 0xFF4FC3F7, "", 30, "Salotto 17° · Camere 21°", "Allarme disinserito"},
+                new Object[] {"Garage", "", 500L, 9000L, 0xFFE53935, "", 30, "Aperto dalle 14:20", ""},
+                new Object[] {"Serata gioco", "", 2000L, 3000L, 0, "MauriTucci", 30});
+        List<GameDay.Turn> t = GameDay.fromRows(rows);
+        assertEquals(3, t.size());
+        assertEquals("Garage", t.get(0).topLine);
+        assertEquals("Aperto dalle 14:20", t.get(0).headline);
+        assertEquals("Salotto 17° · Camere 21°", t.get(1).headline);
+        assertEquals("Allarme disinserito", t.get(1).detail);
+        assertEquals("", t.get(2).headline);
+    }
+
     @Test public void turnSecondsOutOfRangeBecomesThirty() {
         assertEquals(30, GameDay.turnSeconds(Collections.singletonList(new Object[] {"a", "b", 1L, 2L, 0, "c", 500})));
         assertEquals(30, GameDay.turnSeconds(Collections.singletonList(new Object[] {"a", "b", 1L, 2L, 0, "c", 3})));

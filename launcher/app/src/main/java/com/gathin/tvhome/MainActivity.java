@@ -200,7 +200,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private View racePanel;
     private TextView raceKicker, raceHeadline, raceSessions;
     /** game_day: each team's next game from an add-on, rotating in the race panel; null when the key is off. */
-    private GameDay gameDay;
+    /** Fork casa: every add-on game_day names (Game Day, Smart Home), see PanelSources. */
+    private PanelSources gameDay;
+    /** Fork casa: the weather line beside the date, from an add-on in game_day (HeaderWeather). */
+    private HeaderWeather headerWeather;
+    private TextView headerWeatherText;
     private View raceBar;
     private LinearLayout racePager;
     private long rotationStart;
@@ -245,6 +249,18 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private final Rect tileRect = new Rect();
     /** Fork casa: the grid's clip while the dock has focus (updateBelowDockClip). */
     private final Rect belowDockClip = new Rect();
+    /** Fork casa: how often Home re-reads the panel sources and the weather while it is on screen. */
+    private static final long PANEL_REFRESH_MS = 2 * 60_000L;
+    /** Fork casa: Home Assistant's temperatures and alerts change while Home sits there; Game Day's reads are cheap. */
+    private final Runnable panelRefresh = new Runnable() {
+        @Override
+        public void run() {
+            if (gameDay != null) gameDay.read();
+            if (headerWeather != null) headerWeather.read();
+            handler.postDelayed(this, PANEL_REFRESH_MS);
+        }
+    };
+
     /** Fork casa: how much lower the dock sits than upstream's, see the grid's layout listener. */
     private static final float FORK_DOCK_LOWER_DP = 28f;
     /** Fork casa: how dark (0-255) the veil over the dock tiles other than the focused one is: about 35%. */
@@ -583,7 +599,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         raceSessions = findViewById(R.id.raceSessions);
         raceBar = findViewById(R.id.raceBar);
         racePager = findViewById(R.id.racePager);
-        gameDay = GameDay.create(this, cfg.gameDay, handler, this::updatePanel);
+        gameDay = PanelSources.create(this, cfg.gameDay, handler, this::updatePanel);
+        headerWeatherText = findViewById(R.id.headerWeather);
+        headerWeather = HeaderWeather.create(this, cfg.gameDay, handler, this::showHeaderWeather);
         // The rotation runs on the clock that never jumps: setting the TV's time must not stall or stretch a turn.
         rotationStart = SystemClock.elapsedRealtime();
         showStats = cfg.showStats;
@@ -1153,6 +1171,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         if (showStats) startStats();
         if (gameDay != null) gameDay.start();
+        if (headerWeather != null) headerWeather.read();
+        handler.removeCallbacks(panelRefresh);
+        if (gameDay != null || headerWeather != null) handler.postDelayed(panelRefresh, PANEL_REFRESH_MS);
         sky.update();
         wallpaperPlayer.start();
         handler.postDelayed(minuteTick, MINUTE_MS);
@@ -1339,6 +1360,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         stopStats();
         if (gameDay != null) gameDay.stop();
         handler.removeCallbacks(turnTick);
+        handler.removeCallbacks(panelRefresh);
         if (lamp != null) lamp.stop();
         cancelPendingFocusScroll();
         // Nothing of ours stays on screen over another app; an undecided prompt simply returns next time.
@@ -1398,6 +1420,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         RemoteKeys.release(this);
         cancelHoldOk();
         if (gameDay != null) gameDay.shutdown();
+        if (headerWeather != null) headerWeather.shutdown();
         unregisterReceiver(packageReceiver);
         if (openOnStartOnWake) unregisterReceiver(wakeReceiver);
         wallpaperPlayer.close();
@@ -2834,7 +2857,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             bar.setColor(t.colour);
             raceBar.setBackground(bar);
             raceKicker.setText(t.topLine);
-            if (GameDay.live(t, now)) {
+            if (!t.headline.isEmpty()) {
+                // Fork casa: a source's own line (Smart Home's temperatures, an alert's "Aperto dalle 14:20").
+                raceHeadline.setText(t.headline);
+            } else if (GameDay.live(t, now)) {
                 SpannableString live = new SpannableString("\u25CF  " + getString(R.string.game_live));
                 live.setSpan(new ForegroundColorSpan(RACE_RED), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 raceHeadline.setText(live);
@@ -2845,7 +2871,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
             // Fork casa: the same calendar's next entries on the small line, as the F1 row lists its sessions:
             // "VEN 11:00  Manopola caldaia     VEN 17:00  Cambio gomme T-ROC". None: the line takes no room.
-            if (t.later.isEmpty()) {
+            if (!t.detail.isEmpty()) {
+                raceSessions.setText(t.detail);
+                raceSessions.setVisibility(View.VISIBLE);
+            } else if (t.later.isEmpty()) {
                 raceSessions.setVisibility(View.GONE);
             } else {
                 java.time.format.DateTimeFormatter when = java.time.format.DateTimeFormatter.ofPattern(
@@ -2891,6 +2920,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         for (int k = 0; k < count; k++) racePager.getChildAt(k).setAlpha(k == on ? 0.9f : 0.3f);
         racePager.setVisibility(View.VISIBLE);
+    }
+
+    /** Fork casa: HeaderWeather's line; empty hides it. */
+    private void showHeaderWeather(String text) {
+        if (headerWeatherText == null) return;
+        headerWeatherText.setText(text);
+        headerWeatherText.setVisibility(text == null || text.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
     private GameWhen.Templates gameWhenTemplates() {
