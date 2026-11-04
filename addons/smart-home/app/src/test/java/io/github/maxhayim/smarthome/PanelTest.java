@@ -72,6 +72,20 @@ public class PanelTest {
     }
 
     @Test
+    public void chosenEntitiesWithTheirNamesOnTheSmallLine() throws Exception {
+        JSONArray s = home(false).put(st("sensor.energia_adesso", "252 W presi dalla rete", "Energia adesso", null, null));
+        List<String> detail = Arrays.asList("binary_sensor.garage=Box", "sensor.energia_adesso");
+        List<Panel.Turn> t = Panel.turns(s, Collections.emptyList(), detail, NOW, ROME, Locale.ITALIAN);
+        assertEquals("Box chiuso\u2003\u2003252 W presi dalla rete", t.get(0).headline);
+        assertEquals("Camere 21°\u2003\u2003Esterno 16°\u2003\u2003Salotto 17°", t.get(0).detail);
+        // The name given for the small line also titles the entity's alert.
+        JSONArray open = home(true);
+        List<Panel.Turn> a = Panel.turns(open, Collections.emptyList(), detail, NOW, ROME, Locale.ITALIAN);
+        assertEquals("Box", a.get(0).top);
+        assertEquals("Box aperto", a.get(1).headline);
+    }
+
+    @Test
     public void anOpenGarageComesFirstWithItsTime() throws Exception {
         List<Panel.Turn> t = Panel.turns(home(true), Collections.emptyList(), NOW, ROME, Locale.ITALIAN);
         assertEquals(2, t.size());

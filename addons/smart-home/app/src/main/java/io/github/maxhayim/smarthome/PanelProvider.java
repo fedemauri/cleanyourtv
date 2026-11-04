@@ -61,7 +61,7 @@ public final class PanelProvider extends ContentProvider {
                 if (!line.isEmpty()) c.addRow(new Object[] {line});
             } else {
                 long now = System.currentTimeMillis();
-                for (Panel.Turn t : Panel.turns(s, Config.panelTemps(ctx), now, ZoneId.systemDefault(), locale)) {
+                for (Panel.Turn t : Panel.turns(s, Config.panelTemps(ctx), Config.panelDetail(ctx), now, ZoneId.systemDefault(), locale)) {
                     c.addRow(new Object[] {t.top, "", t.startMs, t.endMs, t.colour, "", 30, t.headline, t.detail});
                 }
             }

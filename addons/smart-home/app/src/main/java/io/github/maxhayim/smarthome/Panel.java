@@ -104,6 +104,26 @@ final class Panel {
      * temperature sensors for "Casa" in order; empty picks up to three that read like rooms (-30° to 45°).
      */
     static List<Turn> turns(JSONArray states, List<String> tempIds, long nowMs, ZoneId zone, Locale locale) {
+        return turns(states, tempIds, Collections.emptyList(), nowMs, zone, locale);
+    }
+
+    /**
+     * {@code detailSpecs} ("binary_sensor.garage=Box", "sensor.energia_adesso") picks what the "Casa" turn's main
+     * line shows, in order, and names it, with the temperatures on the small line; without any the temperatures are
+     * the main line and the small one sums up the alarm and the shutters. A name given here
+     * also titles that entity's alert ("Box" / "Aperto dalle 14:20").
+     */
+    static List<Turn> turns(JSONArray states, List<String> tempIds, List<String> detailSpecs, long nowMs, ZoneId zone,
+                            Locale locale) {
+        Map<String, String> labels = new HashMap<>();
+        List<String> detailIds = new ArrayList<>();
+        for (String spec : detailSpecs == null ? Collections.<String>emptyList() : detailSpecs) {
+            int eq = spec.indexOf('=');
+            String id = (eq < 0 ? spec : spec.substring(0, eq)).trim();
+            if (id.isEmpty()) continue;
+            detailIds.add(id);
+            if (eq > 0 && !spec.substring(eq + 1).trim().isEmpty()) labels.put(id, spec.substring(eq + 1).trim());
+        }
         boolean it = it(locale);
         DateTimeFormatter hm = DateTimeFormatter.ofPattern("HH:mm", locale).withZone(zone);
         Map<String, JSONObject> byId = new HashMap<>();
@@ -118,7 +138,7 @@ final class Panel {
         for (JSONObject o : all) {
             String id = o.optString("entity_id"), state = o.optString("state");
             String dc = attributes(o).optString("device_class", "");
-            String name = name(o);
+            String name = labels.containsKey(id) ? labels.get(id) : name(o);
             long since = changedMs(o, nowMs);
             String at = hm.format(Instant.ofEpochMilli(since));
             if (id.startsWith("binary_sensor.") && "on".equals(state)) {
@@ -150,6 +170,47 @@ final class Panel {
             temps.add(shortName(name(o)) + " " + Math.round(Double.parseDouble(o.optString("state"))) + "°");
         }
         List<String> detail = new ArrayList<>();
+        if (!detailIds.isEmpty()) {
+            for (String id : detailIds) {
+                JSONObject o = byId.get(id);
+                if (o == null || !available(o)) continue;
+                detail.add(reading(o, labels.get(id), it));
+            }
+        } else {
+            autoDetail(all, detail, it);
+        }
+        if (!detailIds.isEmpty() && !detail.isEmpty()) {
+            // Fork casa: the chosen entities are what matters most ("Box chiuso  252 W presi dalla rete"): they take
+            // the main line, and the temperatures move to the small one.
+            out.add(new Turn(it ? "Casa" : "Home", String.join("\u2003\u2003", detail), String.join("\u2003\u2003", temps),
+                    HOME, nowMs, nowMs + LIFETIME_MS));
+        } else if (!temps.isEmpty() || !detail.isEmpty()) {
+            String headline = temps.isEmpty() ? detail.remove(0) : String.join("\u2003", temps);
+            out.add(new Turn(it ? "Casa" : "Home", headline, String.join("\u2003\u2003", detail), HOME, nowMs, nowMs + LIFETIME_MS));
+        }
+        return out;
+    }
+
+    /** One entity on the small line: "Box chiuso", or a sensor's own state ("252 W presi dalla rete"). */
+    static String reading(JSONObject o, String label, boolean it) {
+        String id = o.optString("entity_id"), state = o.optString("state");
+        String dc = attributes(o).optString("device_class", "");
+        String name = label != null ? label : name(o);
+        if (id.startsWith("binary_sensor.") || id.startsWith("cover.")) {
+            boolean open = "on".equals(state) || "open".equals(state) || "opening".equals(state);
+            if (dc.equals("garage_door") || dc.equals("door") || dc.equals("window") || dc.equals("opening")
+                    || dc.equals("garage") || id.startsWith("cover.")) {
+                return name + " " + (open ? (it ? "aperto" : "open") : (it ? "chiuso" : "closed"));
+            }
+            return name + " " + ("on".equals(state) ? (it ? "attivo" : "on") : (it ? "spento" : "off"));
+        }
+        String unit = attributes(o).optString("unit_of_measurement", "");
+        String value = number(o) ? Math.round(Double.parseDouble(state)) + (unit.isEmpty() ? "" : " " + unit) : state;
+        return label == null ? value : label + " " + value;
+    }
+
+    /** Without panel_detail: the alarm, and the shutters summed up. */
+    private static void autoDetail(List<JSONObject> all, List<String> detail, boolean it) {
         int up = 0, down = 0;
         for (JSONObject o : all) {
             String id = o.optString("entity_id"), state = o.optString("state");
@@ -162,11 +223,6 @@ final class Panel {
             }
         }
         if (up + down > 0) detail.add(shutters(up, down, it));
-        if (!temps.isEmpty() || !detail.isEmpty()) {
-            String headline = temps.isEmpty() ? detail.remove(0) : String.join("\u2003", temps);
-            out.add(new Turn(it ? "Casa" : "Home", headline, String.join("\u2003\u2003", detail), HOME, nowMs, nowMs + LIFETIME_MS));
-        }
-        return out;
     }
 
     private static List<JSONObject> pickTemps(List<JSONObject> all, Map<String, JSONObject> byId, List<String> ids) {

@@ -60,6 +60,11 @@ final class Config {
         return readGlance(prefs(c).getString("panel_temps", ""));
     }
 
+    /** Fork casa: the "Casa" turn's small line, as "entity_id" or "entity_id=Name" ("binary_sensor.garage=Box"). */
+    static List<String> panelDetail(Context c) {
+        return readGlance(prefs(c).getString("panel_detail", ""));
+    }
+
     static void saveGlance(Context c, List<String> ids) {
         prefs(c).edit().putString("glance", joinGlance(ids)).apply();
     }
@@ -75,6 +80,7 @@ final class Config {
             if (o.has("token")) saveToken(c, o.optString("token"));
             if (o.has("glance")) saveGlance(c, parseGlance(o.opt("glance")));
             if (o.has("panel_temps")) prefs(c).edit().putString("panel_temps", joinGlance(parseGlance(o.opt("panel_temps")))).apply();
+            if (o.has("panel_detail")) prefs(c).edit().putString("panel_detail", joinGlance(parseGlance(o.opt("panel_detail")))).apply();
             return true;
         } catch (Exception e) {
             return false;
