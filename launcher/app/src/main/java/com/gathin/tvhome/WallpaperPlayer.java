@@ -207,6 +207,18 @@ final class WallpaperPlayer {
      * Small light text under the top-right buttons, above everything else and never focusable. It sits where the
      * top bar ends in every layout, so it does not cover the clock, the stats line or the tiles.
      */
+    /**
+     * Fork casa: the caption's top in root pixels, just under the top-right buttons wherever they end up (without
+     * the greeting the header sits higher, and a fixed 110dp left the caption floating below the buttons).
+     */
+    void placeCaption(int topPx) {
+        if (caption == null || topPx <= 0) return;
+        ViewGroup.LayoutParams lp = caption.getLayoutParams();
+        if (!(lp instanceof FrameLayout.LayoutParams) || ((FrameLayout.LayoutParams) lp).topMargin == topPx) return;
+        ((FrameLayout.LayoutParams) lp).topMargin = topPx;
+        caption.setLayoutParams(lp);
+    }
+
     private static TextView makeCaption(Context context, FrameLayout root) {
         float dp = context.getResources().getDisplayMetrics().density;
         TextView text = new TextView(context);

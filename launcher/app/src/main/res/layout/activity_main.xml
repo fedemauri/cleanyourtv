@@ -294,14 +294,14 @@
                             android:gravity="left"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="6dp"
+                            android:layout_marginTop="7dp"
                             android:singleLine="true"
                             android:ellipsize="end"
-                            android:textColor="#8CFFFFFF"
-                            android:textSize="14sp"
+                            android:textColor="#B3FFFFFF"
+                            android:textSize="15sp"
                             android:fontFamily="@string/font_regular"
-                            android:letterSpacing="0.14"
-                            android:textAllCaps="true"
+                            android:letterSpacing="0.02"
+                            android:textAllCaps="false"
                             android:visibility="gone" />
 
                         <!-- Lunar date ("Lunar 13/9 · Year of the Horse"), shown when lunar_date is on. -->

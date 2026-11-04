@@ -10,9 +10,9 @@ import org.junit.Test;
 public class GameWhenTest {
     private static final ZoneId ROME = ZoneId.of("Europe/Rome");
     private static final GameWhen.Templates IT = new GameWhen.Templates(
-            "Tra %1$d min", "Oggi alle %1$s", "Domani alle %1$s", "%1$s alle %2$s", "%1$s · %2$s");
+            "Tra %1$d min", "Oggi alle %1$s", "Domani alle %1$s", "%1$s alle %2$s", "%1$s %2$s");
     private static final GameWhen.Templates EN = new GameWhen.Templates(
-            "In %1$d min", "Today at %1$s", "Tomorrow at %1$s", "%1$s at %2$s", "%1$s · %2$s");
+            "In %1$d min", "Today at %1$s", "Tomorrow at %1$s", "%1$s at %2$s", "%1$s %2$s");
 
     private static long at(int day, int hour, int minute) {
         return ZonedDateTime.of(2026, 11, day, hour, minute, 0, 0, ROME).toInstant().toEpochMilli();
@@ -40,9 +40,9 @@ public class GameWhenTest {
 
     @Test
     public void aSportWordGoesInFrontAndTheRestIsLowerCase() {
-        assertEquals("Calcio d'inizio · domani alle 20:45",
+        assertEquals("Calcio d'inizio domani alle 20:45",
                 GameWhen.text(at(5, 20, 45), NOW, ROME, Locale.ITALIAN, true, "Calcio d'inizio", IT));
-        assertEquals("Calcio d'inizio · tra 10 min",
+        assertEquals("Calcio d'inizio tra 10 min",
                 GameWhen.text(at(4, 12, 10), NOW, ROME, Locale.ITALIAN, true, "Calcio d'inizio", IT));
     }
 

@@ -855,6 +855,13 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
 
         btnInputs = findViewById(R.id.btnInputs);
         View btnSettings = findViewById(R.id.btnSettings);
+        // Fork casa: keep the wallpaper caption 12dp under the buttons, wherever the header puts them.
+        btnSettings.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> {
+            if (wallpaperPlayer == null || v.getHeight() == 0) return;
+            Rect at = new Rect(0, 0, v.getWidth(), v.getHeight());
+            root.offsetDescendantRectToMyCoords(v, at);
+            wallpaperPlayer.placeCaption(at.bottom + Math.round(12 * density));
+        });
         btnInputs.setOnClickListener(v -> showInputs());
         btnWifi.setOnClickListener(v -> openNetworkPill());
         btnVpn.setOnClickListener(v -> openVpnPill());
@@ -2871,6 +2878,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             }
             // Fork casa: the same calendar's next entries on the small line, as the F1 row lists its sessions:
             // "VEN 11:00  Manopola caldaia     VEN 17:00  Cambio gomme T-ROC". None: the line takes no room.
+            // Fork casa: names in sentence case read better without the F1 row's tracking.
+            raceSessions.setLetterSpacing(0.02f);
             if (!t.detail.isEmpty()) {
                 raceSessions.setText(t.detail);
                 raceSessions.setVisibility(View.VISIBLE);
@@ -2882,12 +2891,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                         .withZone(java.time.ZoneId.systemDefault());
                 android.text.SpannableStringBuilder row = new android.text.SpannableStringBuilder();
                 for (GameDay.Turn next : t.later) {
-                    if (row.length() > 0) row.append("     ");
+                    if (row.length() > 0) row.append("\u2003\u2003\u2003");
+                    // "Ven 11:00  Manopola caldaia": what is coming, brighter than when.
+                    String day = when.format(java.time.Instant.ofEpochMilli(next.startMs));
+                    row.append(day.substring(0, 1).toUpperCase(Locale.getDefault())).append(day.substring(1)).append("  ");
                     int start = row.length();
-                    row.append(when.format(java.time.Instant.ofEpochMilli(next.startMs)).toUpperCase(Locale.getDefault()));
-                    row.setSpan(new android.text.style.ForegroundColorSpan(0xFFFFFFFF), start, row.length(),
+                    row.append(next.topLine);
+                    row.setSpan(new android.text.style.ForegroundColorSpan(0xE6FFFFFF), start, row.length(),
                             Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    row.append("  ").append(next.topLine);
                 }
                 raceSessions.setText(row);
                 raceSessions.setVisibility(View.VISIBLE);
@@ -3009,9 +3020,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             return;
         }
         RaceWeekend.Race race = s.race;
-        raceKicker.setText(race.place.isEmpty()
-                ? getString(R.string.race_kicker_no_place, race.round, race.shortName())
-                : getString(R.string.race_kicker, race.round, race.shortName(), race.place));
+        // Fork casa: "Formula 1 a São Paulo" as the title, in the panel's plain voice, instead of "Gara 20 · ... GP".
+        raceKicker.setText(race.place.isEmpty() ? race.shortName() : getString(R.string.race_title_place, race.place));
+        raceSessions.setLetterSpacing(0.12f);
 
         if (s.live != null) {
             SpannableString live = new SpannableString("\u25CF  " + getString(R.string.race_live, s.live.title(getResources())));

@@ -66,7 +66,7 @@ final class Panel {
         b.append(condition(w.optString("state"), locale));
         JSONObject today = firstForecast(forecastReply, w.optString("entity_id"));
         if (today != null && today.has("templow") && today.has("temperature")) {
-            b.append(" · min ").append(Math.round(today.optDouble("templow"))).append("° max ")
+            b.append("\u2003min ").append(Math.round(today.optDouble("templow"))).append("° max ")
                     .append(Math.round(today.optDouble("temperature"))).append('°');
         }
         return b.toString().trim();
@@ -163,8 +163,8 @@ final class Panel {
         }
         if (up + down > 0) detail.add(shutters(up, down, it));
         if (!temps.isEmpty() || !detail.isEmpty()) {
-            String headline = temps.isEmpty() ? detail.remove(0) : String.join(" · ", temps);
-            out.add(new Turn(it ? "Casa" : "Home", headline, String.join("     ", detail), HOME, nowMs, nowMs + LIFETIME_MS));
+            String headline = temps.isEmpty() ? detail.remove(0) : String.join("\u2003", temps);
+            out.add(new Turn(it ? "Casa" : "Home", headline, String.join("\u2003\u2003", detail), HOME, nowMs, nowMs + LIFETIME_MS));
         }
         return out;
     }

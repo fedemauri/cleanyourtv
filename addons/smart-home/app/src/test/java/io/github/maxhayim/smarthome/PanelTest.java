@@ -47,7 +47,7 @@ public class PanelTest {
     public void weatherLineWithTodaysRange() throws Exception {
         JSONObject forecast = new JSONObject("{\"service_response\":{\"weather.forecast_casa\":{\"forecast\":"
                 + "[{\"condition\":\"cloudy\",\"temperature\":13.3,\"templow\":11.2}]}}}");
-        assertEquals("13° Nuvoloso · min 11° max 13°", Panel.weatherLine(home(false), forecast, Locale.ITALIAN));
+        assertEquals("13° Nuvoloso\u2003min 11° max 13°", Panel.weatherLine(home(false), forecast, Locale.ITALIAN));
         assertEquals("13° Nuvoloso", Panel.weatherLine(home(false), null, Locale.ITALIAN));
         assertEquals("13° Cloudy", Panel.weatherLine(home(false), null, Locale.ENGLISH));
         assertEquals("", Panel.weatherLine(new JSONArray(), null, Locale.ITALIAN));
@@ -59,8 +59,8 @@ public class PanelTest {
         assertEquals(1, t.size());
         assertEquals("Casa", t.get(0).top);
         // 50° (a device's own temperature) and "unknown" are left out; names lose "Temperatura".
-        assertEquals("Camere 21° · Esterno 16° · Salotto 17°", t.get(0).headline);
-        assertEquals("Allarme disinserito     Tapparelle: 2 su, 1 giù", t.get(0).detail);
+        assertEquals("Camere 21°\u2003Esterno 16°\u2003Salotto 17°", t.get(0).headline);
+        assertEquals("Allarme disinserito\u2003\u2003Tapparelle: 2 su, 1 giù", t.get(0).detail);
         assertEquals("Tapparelle su", Panel.shutters(3, 0, true));
     }
 
@@ -68,7 +68,7 @@ public class PanelTest {
     public void namedSensorsKeepTheirOrder() throws Exception {
         List<Panel.Turn> t = Panel.turns(home(false), Arrays.asList("sensor.blink_salotto_temperatura",
                 "sensor.blink_camere_temperatura", "sensor.blink_esterno_temperatura"), NOW, ROME, Locale.ITALIAN);
-        assertEquals("Salotto 17° · Camere 21° · Esterno 16°", t.get(0).headline);
+        assertEquals("Salotto 17°\u2003Camere 21°\u2003Esterno 16°", t.get(0).headline);
     }
 
     @Test
