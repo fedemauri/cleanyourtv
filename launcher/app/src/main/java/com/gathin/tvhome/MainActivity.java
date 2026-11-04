@@ -247,8 +247,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private final Rect belowDockClip = new Rect();
     /** Fork casa: how much lower the dock sits than upstream's, see the grid's layout listener. */
     private static final float FORK_DOCK_LOWER_DP = 28f;
-    /** Fork casa: dock tiles other than the focused one fade to this, so the focused app reads from the sofa. */
-    private static final float FORK_DOCK_REST_ALPHA = 0.6f;
+    /** Fork casa: how dark (0-255) the veil over the dock tiles other than the focused one is: about 35%. */
+    private static final int FORK_DOCK_REST_SHADE = 90;
     private final Rect revealRect = new Rect();
     // Static so they survive the activity being destroyed while another app is open (low-memory TVs,
     // or Developer options → "Don't keep activities"); they only reset when the process dies.
@@ -2927,9 +2927,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     }
 
     /**
-     * Fork casa: while a dock tile has focus the other dock tiles fade to FORK_DOCK_REST_ALPHA, so the focused one
-     * stands out over a bright wallpaper and a white banner (Netflix) where the glass rim alone was lost. Everything
-     * is back to full as soon as focus leaves the dock. Works on the item views, which nothing else animates.
+     * Fork casa: while a dock tile has focus the other dock tiles are darkened by FORK_DOCK_REST_SHADE, a black
+     * veil drawn over each card, so the focused one stands out over a bright wallpaper and a white banner (Netflix)
+     * where the glass rim alone was lost. The tiles stay opaque: fading them let the wallpaper show through the
+     * banners. Everything is back to full as soon as focus leaves the dock.
      */
     private void updateDockDim() {
         if (grid == null || !dockRow || singleRow) return;
@@ -2938,11 +2939,30 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             View child = grid.getChildAt(i);
             int p = grid.getChildAdapterPosition(child);
             if (p == RecyclerView.NO_POSITION) continue;
-            float target = dockFocused && p < COLUMNS && p != lastFocused ? FORK_DOCK_REST_ALPHA : 1f;
-            if (child.getAlpha() == target) continue;
-            child.animate().cancel();
-            if (animations && !reducedMotion) child.animate().alpha(target).setDuration(160).start();
-            else child.setAlpha(target);
+            View card = child.findViewById(R.id.card);
+            if (card == null || card.getWidth() == 0) continue;
+            int target = dockFocused && p < COLUMNS && p != lastFocused ? FORK_DOCK_REST_SHADE : 0;
+            android.graphics.drawable.Drawable fg = card.getForeground();
+            if (!(fg instanceof GradientDrawable)) {
+                if (target == 0) continue;
+                GradientDrawable veil = new GradientDrawable();
+                veil.setColor(0xFF000000);
+                veil.setCornerRadius(AppAdapter.cornerRadius(card.getWidth(), density));
+                veil.setAlpha(0);
+                card.setForeground(veil);
+                fg = veil;
+            }
+            final android.graphics.drawable.Drawable veil = fg;
+            if (veil.getAlpha() == target) continue;
+            if (animations && !reducedMotion) {
+                android.animation.ObjectAnimator a = android.animation.ObjectAnimator.ofInt(veil, "alpha", veil.getAlpha(), target);
+                a.setDuration(160);
+                a.addUpdateListener(an -> card.invalidate());
+                a.start();
+            } else {
+                veil.setAlpha(target);
+                card.invalidate();
+            }
         }
     }
 
