@@ -243,6 +243,8 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private final Rect glassCardRect = new Rect();
     private boolean glassShown;
     private final Rect tileRect = new Rect();
+    /** Fork casa: the grid's clip while the dock has focus (updateBelowDockClip). */
+    private final Rect belowDockClip = new Rect();
     private final Rect revealRect = new Rect();
     // Static so they survive the activity being destroyed while another app is open (low-memory TVs,
     // or Developer options → "Don't keep activities"); they only reset when the process dies.
@@ -695,6 +697,14 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         Order savedOrder = Order.load(Order.file(this));
         adapter.setSavedOrder(Order.ranks(savedOrder, dockApps), Order.docked(savedOrder, dockApps));
         grid.setAdapter(adapter);
+        // Fork casa: keep the rows under the dock hidden while it has focus (updateBelowDockClip).
+        grid.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView rv, int newState) {
+                updateBelowDockClip();
+            }
+        });
+        grid.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> grid.post(this::updateBelowDockClip));
 
         // tvOS layout: push the dock row towards the bottom of the screen, leaving room for
         // rows_below_dock grid rows under it; the rest of the grid stays below until you press Down.
@@ -1875,6 +1885,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             revealRect.set(0, -(int) pad * 2, item.getWidth(), item.getHeight() + (int) pad);
             grid.requestChildRectangleOnScreen(item, revealRect, reducedMotion);
         }
+        updateBelowDockClip();
     }
 
     /** Refits the glass to the focused holder once the grid layout and tile dimensions settle. */
@@ -2814,8 +2825,9 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 live.setSpan(new ForegroundColorSpan(RACE_RED), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 raceHeadline.setText(live);
             } else {
-                String in = RaceWeekend.countdown(getResources(), GameDay.until(t, now));
-                raceHeadline.setText(t.word.isEmpty() ? in : getString(R.string.race_next, t.word, in));
+                // Fork casa: the day and time instead of "tra 2g 4h" (GameWhen).
+                raceHeadline.setText(GameWhen.text(t.startMs, now, java.time.ZoneId.systemDefault(), Locale.getDefault(),
+                        ClockFormat.is24(this, clockFormat), t.word, gameWhenTemplates()));
             }
             // No session times for a game: the line takes no room, so the dots sit under the countdown.
             raceSessions.setVisibility(View.GONE);
@@ -2847,6 +2859,39 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         }
         for (int k = 0; k < count; k++) racePager.getChildAt(k).setAlpha(k == on ? 0.9f : 0.3f);
         racePager.setVisibility(View.VISIBLE);
+    }
+
+    private GameWhen.Templates gameWhenTemplates() {
+        return new GameWhen.Templates(getString(R.string.game_when_minutes), getString(R.string.game_when_today),
+                getString(R.string.game_when_tomorrow), getString(R.string.game_when_day),
+                getString(R.string.game_when_with_word));
+    }
+
+    /**
+     * Fork casa: while focus is on the dock, the grid rows below it stay hidden instead of peeking in at the
+     * bottom edge over the wallpaper. The grid is clipped at the top of the first tile after the dock; the
+     * clip goes as soon as focus moves down (onTileFocused) or the grid scrolls, so the rows appear then.
+     */
+    private void updateBelowDockClip() {
+        if (grid == null) return;
+        boolean inDock = DockSlots.inDockRow(dockRow, singleRow, lastFocused, COLUMNS);
+        if (!dockRow || singleRow || !inDock || grid.getScrollState() != RecyclerView.SCROLL_STATE_IDLE) {
+            if (grid.getClipBounds() != null) grid.setClipBounds(null);
+            return;
+        }
+        int cut = -1;
+        for (int i = 0; i < grid.getChildCount(); i++) {
+            View child = grid.getChildAt(i);
+            int p = grid.getChildAdapterPosition(child);
+            if (p == RecyclerView.NO_POSITION || p < COLUMNS) continue;
+            if (cut < 0 || child.getTop() < cut) cut = child.getTop();
+        }
+        if (cut <= 0 || cut >= grid.getHeight()) {
+            if (grid.getClipBounds() != null) grid.setClipBounds(null);
+            return;
+        }
+        belowDockClip.set(0, 0, grid.getWidth(), cut);
+        if (!belowDockClip.equals(grid.getClipBounds())) grid.setClipBounds(belowDockClip);
     }
 
     private void updateRace() {        // an empty calendar (a theme without race_calendar, or a reset) hides a panel the last theme showed

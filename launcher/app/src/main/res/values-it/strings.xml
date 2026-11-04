@@ -146,6 +146,11 @@
     <string name="race_countdown_days">%1$dg %2$dh</string>
     <string name="last_opened">Ultima apertura: %1$s</string>
     <string name="game_live">In diretta</string>
+    <string name="game_when_minutes">Tra %1$d min</string>
+    <string name="game_when_today">Oggi alle %1$s</string>
+    <string name="game_when_tomorrow">Domani alle %1$s</string>
+    <string name="game_when_day">%1$s alle %2$s</string>
+    <string name="game_when_with_word">%1$s · %2$s</string>
     <string name="clock_format_system">Sistema</string>
     <string name="clock_format_12">12 ore</string>
     <string name="clock_format_24">24 ore</string>

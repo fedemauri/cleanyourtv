@@ -155,6 +155,11 @@
     <string name="last_opened">Last opened %1$s</string>
     <!-- game_day: a game on now, in the race panel. -->
     <string name="game_live">Live now</string>
+    <string name="game_when_minutes">In %1$d min</string>
+    <string name="game_when_today">Today at %1$s</string>
+    <string name="game_when_tomorrow">Tomorrow at %1$s</string>
+    <string name="game_when_day">%1$s at %2$s</string>
+    <string name="game_when_with_word">%1$s · %2$s</string>
     <string name="clock_format_system">System</string>
     <string name="clock_format_12">12-hour</string>
     <string name="clock_format_24">24-hour</string>

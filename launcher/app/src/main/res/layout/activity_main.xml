@@ -51,11 +51,11 @@
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
-            <!-- A short kerb-red bar, the panel's one accent. -->
+            <!-- A short kerb-red bar, the panel's one accent. Fork casa: the title is the big line, the time the small one. -->
             <View
                 android:layout_width="3dp"
-                android:layout_height="13dp"
-                android:layout_marginEnd="10dp"
+                android:layout_height="22dp"
+                android:layout_marginEnd="12dp"
                 android:id="@+id/raceBar"
                 android:background="@drawable/race_bar" />
 
@@ -64,29 +64,33 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:singleLine="true"
-                android:textColor="#B3FFFFFF"
-                android:textSize="12sp"
-                android:fontFamily="@string/font_medium"
-                android:letterSpacing="0.22"
-                android:textAllCaps="true" />
+                android:ellipsize="end"
+                android:maxWidth="560dp"
+                android:textColor="#FFFFFFFF"
+                android:textSize="22sp"
+                android:fontFamily="@string/font_regular"
+                android:letterSpacing="0"
+                android:includeFontPadding="false" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/raceHeadline"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginStart="15dp"
+            android:layout_marginTop="6dp"
             android:singleLine="true"
-            android:textColor="#FFFFFFFF"
-            android:textSize="34sp"
-            android:fontFamily="@string/font_light"
-            android:letterSpacing="-0.01"
+            android:textColor="#D9FFFFFF"
+            android:textSize="16sp"
+            android:fontFamily="@string/font_regular"
+            android:letterSpacing="0.01"
             android:includeFontPadding="false" />
 
         <TextView
             android:id="@+id/raceSessions"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="15dp"
             android:layout_marginTop="12dp"
             android:singleLine="true"
             android:textColor="#99FFFFFF"
@@ -99,6 +103,7 @@
             android:id="@+id/racePager"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="15dp"
             android:layout_marginTop="12dp"
             android:orientation="horizontal"
             android:visibility="gone" />
