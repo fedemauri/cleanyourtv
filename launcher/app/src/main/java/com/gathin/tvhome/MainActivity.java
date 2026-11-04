@@ -245,6 +245,10 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     private final Rect tileRect = new Rect();
     /** Fork casa: the grid's clip while the dock has focus (updateBelowDockClip). */
     private final Rect belowDockClip = new Rect();
+    /** Fork casa: how much lower the dock sits than upstream's, see the grid's layout listener. */
+    private static final float FORK_DOCK_LOWER_DP = 28f;
+    /** Fork casa: dock tiles other than the focused one fade to this, so the focused app reads from the sofa. */
+    private static final float FORK_DOCK_REST_ALPHA = 0.6f;
     private final Rect revealRect = new Rect();
     // Static so they survive the activity being destroyed while another app is open (low-memory TVs,
     // or Developer options → "Don't keep activities"); they only reset when the process dies.
@@ -704,7 +708,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 updateBelowDockClip();
             }
         });
-        grid.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> grid.post(this::updateBelowDockClip));
+        grid.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> grid.post(() -> {
+            updateBelowDockClip();
+            updateDockDim();
+        }));
+        grid.getViewTreeObserver().addOnGlobalFocusChangeListener((oldFocus, newFocus) -> updateDockDim());
 
         // tvOS layout: push the dock row towards the bottom of the screen, leaving room for
         // rows_below_dock grid rows under it; the rest of the grid stays below until you press Down.
@@ -721,6 +729,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             // even when the theme requests an extra visible row below the dock.
             int shelfClearance = cfg.appLibrary ? hero.getMeasuredHeight() + (int) (40 * density) : 0;
             int want = Math.max(shelfClearance, h - dockRow - gridRows - (int) (AppAdapter.BOTTOM_ROOM_DP * density));
+            // Fork casa: with no title above it and no rows peeking under it (updateBelowDockClip), the dock sits
+            // lower, keeping 37dp below its band (TV safe area is 27dp at 1080p).
+            if (MainActivity.this.dockRow && !singleRow && rowsBelowDock == 0 && !cfg.dockTitle) {
+                want += (int) (FORK_DOCK_LOWER_DP * density);
+            }
             // Where the rows cannot fit even at the smallest tile (3 rows with the title on), the title keeps its
             // room above the dock and the last rows run off the bottom instead of the title drawing over the clock.
             if (MainActivity.this.dockRow && cfg.dockTitle && rowsBelowDock > 0) want = Math.max(want, (int) (AppAdapter.TITLE_ROOM_DP * density));
@@ -1886,6 +1899,7 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             grid.requestChildRectangleOnScreen(item, revealRect, reducedMotion);
         }
         updateBelowDockClip();
+        updateDockDim();
     }
 
     /** Refits the glass to the focused holder once the grid layout and tile dimensions settle. */
@@ -2894,6 +2908,26 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
         if (!belowDockClip.equals(grid.getClipBounds())) grid.setClipBounds(belowDockClip);
     }
 
+    /**
+     * Fork casa: while a dock tile has focus the other dock tiles fade to FORK_DOCK_REST_ALPHA, so the focused one
+     * stands out over a bright wallpaper and a white banner (Netflix) where the glass rim alone was lost. Everything
+     * is back to full as soon as focus leaves the dock. Works on the item views, which nothing else animates.
+     */
+    private void updateDockDim() {
+        if (grid == null || !dockRow || singleRow) return;
+        boolean dockFocused = grid.hasFocus() && DockSlots.inDockRow(dockRow, singleRow, lastFocused, COLUMNS);
+        for (int i = 0; i < grid.getChildCount(); i++) {
+            View child = grid.getChildAt(i);
+            int p = grid.getChildAdapterPosition(child);
+            if (p == RecyclerView.NO_POSITION) continue;
+            float target = dockFocused && p < COLUMNS && p != lastFocused ? FORK_DOCK_REST_ALPHA : 1f;
+            if (child.getAlpha() == target) continue;
+            child.animate().cancel();
+            if (animations && !reducedMotion) child.animate().alpha(target).setDuration(160).start();
+            else child.setAlpha(target);
+        }
+    }
+
     private void updateRace() {        // an empty calendar (a theme without race_calendar, or a reset) hides a panel the last theme showed
         RaceWeekend.State s = raceCalendar.isEmpty() ? null : RaceWeekend.at(raceCalendar, java.time.Instant.now());
         if (s == null) {
@@ -2910,9 +2944,11 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
             live.setSpan(new android.text.style.ForegroundColorSpan(RACE_RED), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             raceHeadline.setText(live);
         } else if (s.next != null) {
-            String in = RaceWeekend.countdown(getResources(), s.untilNext);
-            raceHeadline.setText(s.next.isRace() ? getString(R.string.race_lights_out, in)
-                    : getString(R.string.race_next, s.next.title(getResources()), in));
+            // Fork casa: "Gara · domenica 8 alle 18:00", "Qualifiche · tra 25 min" (GameWhen), as the calendar turns.
+            long nowMs = System.currentTimeMillis();
+            raceHeadline.setText(GameWhen.text(nowMs + s.untilNext.toMillis(), nowMs, java.time.ZoneId.systemDefault(),
+                    Locale.getDefault(), ClockFormat.is24(this, clockFormat), s.next.title(getResources()),
+                    gameWhenTemplates()));
         } else {
             raceHeadline.setText(R.string.race_finished);
         }

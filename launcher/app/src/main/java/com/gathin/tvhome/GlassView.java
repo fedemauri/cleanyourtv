@@ -65,7 +65,8 @@ public class GlassView extends View {
     void setStyle(String style) {
         flat = Config.GLASS_RIM.equals(style) || Config.GLASS_HALO.equals(style);
         halo = Config.GLASS_HALO.equals(style);
-        rim.setStrokeWidth((flat ? 2f : 1.5f) * density);
+        // Fork casa: a 3dp rim for rim and halo, which a 2dp one did not make visible on a white banner from the sofa.
+        rim.setStrokeWidth((flat ? 3f : 1.5f) * density);
         invalidate();
     }
 
@@ -92,7 +93,8 @@ public class GlassView extends View {
         if (!flat || halo) {
             int rings = 12;
             float step = inset / rings;
-            int alpha = flat ? glowAlpha / 2 : glowAlpha;
+            // Fork casa: halo keeps the glow's full strength instead of half, so the app's colour reads around the tile.
+            int alpha = flat && !halo ? glowAlpha / 2 : glowAlpha;
             glow.setStrokeWidth(step + 0.5f);
             for (int i = 0; i < rings; i++) {
                 float o = step * (i + 0.5f);
