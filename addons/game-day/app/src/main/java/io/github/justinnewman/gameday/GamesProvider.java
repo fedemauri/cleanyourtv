@@ -36,7 +36,8 @@ public final class GamesProvider extends ContentProvider {
         int seconds = repo.turnSeconds();
         MatrixCursor c = new MatrixCursor(COLUMNS);
         for (Schedule.Turn t : repo.turns(now)) {
-            c.addRow(new Object[] {t.topLine, t.word, t.startMs, t.endMs, t.colour, t.calendar, seconds});
+            c.addRow(new Object[] {t.topLine, Words.local(t.word, java.util.Locale.getDefault()), t.startMs, t.endMs, t.colour,
+                    t.calendar, seconds});
         }
         c.setNotificationUri(ctx.getContentResolver(), TURNS);
         Background.refresh(ctx, now);
