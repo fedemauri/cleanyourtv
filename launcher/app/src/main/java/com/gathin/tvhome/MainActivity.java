@@ -2843,8 +2843,26 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
                 raceHeadline.setText(GameWhen.text(t.startMs, now, java.time.ZoneId.systemDefault(), Locale.getDefault(),
                         ClockFormat.is24(this, clockFormat), t.word, gameWhenTemplates()));
             }
-            // No session times for a game: the line takes no room, so the dots sit under the countdown.
-            raceSessions.setVisibility(View.GONE);
+            // Fork casa: the same calendar's next entries on the small line, as the F1 row lists its sessions:
+            // "VEN 11:00  Manopola caldaia     VEN 17:00  Cambio gomme T-ROC". None: the line takes no room.
+            if (t.later.isEmpty()) {
+                raceSessions.setVisibility(View.GONE);
+            } else {
+                java.time.format.DateTimeFormatter when = java.time.format.DateTimeFormatter.ofPattern(
+                        ClockFormat.is24(this, clockFormat) ? "EEE HH:mm" : "EEE h:mm a", Locale.getDefault())
+                        .withZone(java.time.ZoneId.systemDefault());
+                android.text.SpannableStringBuilder row = new android.text.SpannableStringBuilder();
+                for (GameDay.Turn next : t.later) {
+                    if (row.length() > 0) row.append("     ");
+                    int start = row.length();
+                    row.append(when.format(java.time.Instant.ofEpochMilli(next.startMs)).toUpperCase(Locale.getDefault()));
+                    row.setSpan(new android.text.style.ForegroundColorSpan(0xFFFFFFFF), start, row.length(),
+                            Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    row.append("  ").append(next.topLine);
+                }
+                raceSessions.setText(row);
+                raceSessions.setVisibility(View.VISIBLE);
+            }
             racePanel.setVisibility(View.VISIBLE);
         }
         showPager(turns.size(), on);

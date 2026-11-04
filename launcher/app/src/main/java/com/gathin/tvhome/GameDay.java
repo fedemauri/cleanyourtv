@@ -25,6 +25,8 @@ import java.util.concurrent.RejectedExecutionException;
  * offline. Contract: docs/modules.md.
  */
 final class GameDay {
+    /** Fork casa: how many of a calendar's following entries the small line lists. */
+    static final int LATER_MAX = 2;
     static final String META = "com.gathin.tvhome.games";
     static final int TURN_DEFAULT = 30;
     private static final String[] COLUMNS = {"top_line", "word", "start_ms", "end_ms", "colour", "calendar", "turn_seconds"};
@@ -135,14 +137,27 @@ final class GameDay {
     /** The add-on's rows as turns; a row without a top line or with impossible times is skipped. */
     static List<Turn> fromRows(List<Object[]> rows) {
         List<Turn> out = new ArrayList<>();
-        for (Object[] r : rows) {
+        // Fork casa: an add-on that sends a calendar's next few entries gets one turn per calendar, the soonest,
+        // with the others on its small line (Turn.later). Rows without a calendar name stay turns of their own.
+        java.util.Map<String, Turn> byCalendar = new java.util.HashMap<>();
+        List<Object[]> sorted = new ArrayList<>(rows);
+        Collections.sort(sorted, Comparator.comparingLong(r -> r[2] instanceof Number ? ((Number) r[2]).longValue() : Long.MAX_VALUE));
+        for (Object[] r : sorted) {
             if (!(r[0] instanceof String) || ((String) r[0]).isEmpty()) continue;
             long start = r[2] instanceof Number ? ((Number) r[2]).longValue() : -1;
             long end = r[3] instanceof Number ? ((Number) r[3]).longValue() : -1;
             if (start < 0 || end <= start) continue;
             String word = r[1] instanceof String ? (String) r[1] : "";
             int colour = r[4] instanceof Number ? ((Number) r[4]).intValue() : 0xFFFFFFFF;
-            out.add(new Turn((String) r[0], word, start, end, colour));
+            Turn t = new Turn((String) r[0], word, start, end, colour);
+            String calendar = r[5] instanceof String ? (String) r[5] : "";
+            Turn first = calendar.isEmpty() ? null : byCalendar.get(calendar);
+            if (first == null) {
+                out.add(t);
+                if (!calendar.isEmpty()) byCalendar.put(calendar, t);
+            } else if (first.later.size() < LATER_MAX) {
+                first.later.add(t);
+            }
         }
         return out;
     }
@@ -165,6 +180,8 @@ final class GameDay {
         /** ARGB, for the short bar. */
         final int colour;
         final boolean f1;
+        /** Fork casa: the same calendar's next entries after this one, for the panel's small line. */
+        final List<Turn> later = new ArrayList<>();
 
         Turn(String topLine, String word, long startMs, long endMs, int colour) {
             this(topLine, word, startMs, endMs, colour, false);

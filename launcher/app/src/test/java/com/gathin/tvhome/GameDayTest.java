@@ -110,6 +110,24 @@ public class GameDayTest {
         assertEquals(45, GameDay.turnSeconds(rows));
     }
 
+    // Fork casa: one turn per calendar, the soonest, with the next two on its small line.
+    @Test public void aCalendarsEntriesBecomeOneTurnWithTheRestLater() {
+        List<Object[]> rows = Arrays.asList(
+                new Object[] {"Cambio gomme T-ROC", "", 3000L, 4000L, 0, "MauriTucci", 30},
+                new Object[] {"Serata gioco", "", 1000L, 2000L, 0, "MauriTucci", 30},
+                new Object[] {"Manopola caldaia", "", 2000L, 2500L, 0, "MauriTucci", 30},
+                new Object[] {"Piscina Alice", "", 5000L, 6000L, 0, "MauriTucci", 30},
+                new Object[] {"Juventus - Bologna", "Calcio d'inizio", 2500L, 9000L, 0, "Juventus", 30});
+        List<GameDay.Turn> t = GameDay.fromRows(rows);
+        assertEquals(2, t.size());
+        assertEquals("Serata gioco", t.get(0).topLine);
+        assertEquals(2, t.get(0).later.size());
+        assertEquals("Manopola caldaia", t.get(0).later.get(0).topLine);
+        assertEquals("Cambio gomme T-ROC", t.get(0).later.get(1).topLine);
+        assertEquals("Juventus - Bologna", t.get(1).topLine);
+        assertEquals(0, t.get(1).later.size());
+    }
+
     @Test public void turnSecondsOutOfRangeBecomesThirty() {
         assertEquals(30, GameDay.turnSeconds(Collections.singletonList(new Object[] {"a", "b", 1L, 2L, 0, "c", 500})));
         assertEquals(30, GameDay.turnSeconds(Collections.singletonList(new Object[] {"a", "b", 1L, 2L, 0, "c", 3})));
