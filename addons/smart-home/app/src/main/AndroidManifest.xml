@@ -31,6 +31,15 @@
             <meta-data android:name="com.gathin.tvhome.card" android:resource="@xml/module_card" />
         </activity>
 
+        <!-- Fork casa: Home Assistant on the launcher's Home (PanelProvider). List this package in the launcher's
+             game_day key; the launcher reads the panel turns and the weather line from here. Read-only, nothing secret. -->
+        <meta-data android:name="com.gathin.tvhome.games" android:value="${applicationId}.panel" />
+        <meta-data android:name="com.gathin.tvhome.weather" android:value="${applicationId}.panel" />
+        <provider
+            android:name=".PanelProvider"
+            android:authorities="${applicationId}.panel"
+            android:exported="true" />
+
         <!-- install.sh writes the server address and token here with `content write`, so the token never sits on
              a command line. Write-only, one file name, and only the ADB shell may call it. -->
         <provider

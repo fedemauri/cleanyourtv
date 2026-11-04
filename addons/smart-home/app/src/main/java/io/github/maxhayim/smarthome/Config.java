@@ -52,6 +52,14 @@ final class Config {
         prefs(c).edit().putString("token", token == null ? "" : token.trim()).apply();
     }
 
+    /**
+     * Fork casa: the temperature sensors for Home's "Casa" turn (PanelProvider), in order; empty means auto-pick.
+     * Pushed as "panel_temps" in the same config.json as the address and token.
+     */
+    static List<String> panelTemps(Context c) {
+        return readGlance(prefs(c).getString("panel_temps", ""));
+    }
+
     static void saveGlance(Context c, List<String> ids) {
         prefs(c).edit().putString("glance", joinGlance(ids)).apply();
     }
@@ -66,6 +74,7 @@ final class Config {
             if (o.has("url")) saveUrl(c, o.optString("url"));
             if (o.has("token")) saveToken(c, o.optString("token"));
             if (o.has("glance")) saveGlance(c, parseGlance(o.opt("glance")));
+            if (o.has("panel_temps")) prefs(c).edit().putString("panel_temps", joinGlance(parseGlance(o.opt("panel_temps")))).apply();
             return true;
         } catch (Exception e) {
             return false;
