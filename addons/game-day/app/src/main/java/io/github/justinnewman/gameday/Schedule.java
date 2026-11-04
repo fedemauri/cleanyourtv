@@ -18,6 +18,11 @@ import java.util.Set;
  */
 final class Schedule {
     static final Duration WINDOW = Duration.ofDays(7);
+    /**
+     * Fork casa: the next entries of each calendar within the window, not only the next one. The launcher shows the
+     * first as the panel's turn and the others on its small line ("VEN 11:00 Manopola caldaia").
+     */
+    static final int PER_CALENDAR = 3;
 
     static final class Turn {
         final String topLine;
@@ -51,17 +56,17 @@ final class Schedule {
             if (events == null || events.isEmpty()) continue;
             List<Ics.Event> sorted = new ArrayList<>(events);
             sorted.sort(Comparator.comparing(e -> e.start));
+            int taken = 0;
             for (Ics.Event e : sorted) {
                 Instant end = endOf(e, c.sport, zone);
                 if (!end.isAfter(now)) continue;
-                if (e.start.isBefore(horizon)) {
-                    String top = Titles.topLine(e.title, c.name);
-                    if (seen.add(top.toLowerCase(Locale.ROOT) + "|" + e.start.toEpochMilli())) {
-                        out.add(new Turn(top, Titles.word(c.sport, e.title), c.name, e.start.toEpochMilli(),
-                                end.toEpochMilli(), Palette.colour(c.colour)));
-                    }
+                if (!e.start.isBefore(horizon)) break;
+                String top = Titles.topLine(e.title, c.name);
+                if (seen.add(top.toLowerCase(Locale.ROOT) + "|" + e.start.toEpochMilli())) {
+                    out.add(new Turn(top, Titles.word(c.sport, e.title), c.name, e.start.toEpochMilli(),
+                            end.toEpochMilli(), Palette.colour(c.colour)));
                 }
-                break;
+                if (++taken >= PER_CALENDAR) break;
             }
         }
         Collections.sort(out, Comparator.comparingLong(t -> t.startMs));

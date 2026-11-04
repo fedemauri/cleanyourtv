@@ -44,11 +44,13 @@ public class ScheduleTest {
         return m;
     }
 
-    @Test public void oneTurnPerCalendarItsNextEntry() {
+    // Fork casa: up to Schedule.PER_CALENDAR entries per calendar within the window, soonest first.
+    @Test public void aCalendarsNextEntriesSoonestFirst() {
         List<Schedule.Turn> t = turns(events(WILD, Arrays.asList(
                 ev("🏒 Minnesota Wild @ Dallas Stars", Duration.ofDays(2), Duration.ofHours(3)),
                 ev("🏒 Colorado Avalanche @ Minnesota Wild", Duration.ofHours(1), Duration.ofHours(3)))), WILD);
-        assertEquals(1, t.size());
+        assertEquals(2, t.size());
+        assertEquals("Minnesota Wild at Dallas Stars", t.get(1).topLine);
         Schedule.Turn turn = t.get(0);
         assertEquals("Colorado Avalanche at Minnesota Wild", turn.topLine);
         assertEquals("Puck drop", turn.word);

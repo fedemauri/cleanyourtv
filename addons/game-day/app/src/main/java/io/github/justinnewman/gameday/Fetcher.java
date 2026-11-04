@@ -58,7 +58,7 @@ final class Fetcher {
             if (error != null) return failed(previous, nowMs, error);
             int entries;
             try (Reader r = new InputStreamReader(Files.newInputStream(part.toPath()), StandardCharsets.UTF_8)) {
-                entries = Ics.parse(r, ZoneOffset.UTC, ALL_FROM, ALL_TO).size();
+                entries = Ics.parse(r, ZoneOffset.UTC, ALL_FROM, ALL_TO, false).size();
             } catch (Ics.NotACalendar notCalendar) {
                 return failed(previous, nowMs, notCalendar.getMessage());
             }

@@ -14,14 +14,20 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Reads the events of an iCalendar file (RFC 5545), as calendar apps subscribe to them: Stanza, Google Calendar's
  * secret address, a team's own feed. Only what Game Day needs: each event's title, start and end. Line by line,
  * keeping only the events in a window, so a season's file (Stanza's is about 130 KB) never sits in memory whole.
- * Repeating events (RRULE) are read as their first occurrence; sports calendars list every game on its own.
+ * Repeating events (RRULE) are expanded in the window by {@link Recur}, with EXDATE and moved or cancelled
+ * occurrences (RECURRENCE-ID); a rule Recur does not know keeps its first occurrence. Fork casa: a family calendar
+ * is mostly repeating events ("Serata gioco" every Wednesday), which upstream read only as their first date.
  */
 final class Ics {
 
@@ -65,8 +71,17 @@ final class Ics {
      * before {@code to}. Floating times and all-day dates are read in {@code zone}, the TV's time zone.
      */
     static List<Event> parse(Reader in, ZoneId zone, Instant from, Instant to) throws NotACalendar, IOException {
+        return parse(in, zone, from, to, true);
+    }
+
+    /**
+     * {@code expand} false reads a repeating event as its first occurrence only: for counting a file's entries
+     * over all time (Fetcher), where expanding every weekly event to the year 2200 would be work for nothing.
+     */
+    static List<Event> parse(Reader in, ZoneId zone, Instant from, Instant to, boolean expand)
+            throws NotACalendar, IOException {
         BufferedReader r = in instanceof BufferedReader ? (BufferedReader) in : new BufferedReader(in);
-        List<Event> events = new ArrayList<>();
+        Acc events = new Acc(expand);
         Deque<String> components = new ArrayDeque<>();
         boolean started = false;
         Draft draft = null;
@@ -98,11 +113,63 @@ final class Ics {
             pending = raw;
         }
         if (!started) throw new NotACalendar();
-        return events;
+        events.expand(zone, from, to);
+        return events.events;
+    }
+
+    /** What a parse collects: the events, the repeating ones to expand at the end, and the moved occurrences. */
+    private static final class Acc {
+        final List<Event> events = new ArrayList<>();
+        final List<Master> masters = new ArrayList<>();
+        /** uid|epoch millis of each occurrence a RECURRENCE-ID event replaces or cancels. */
+        final Set<String> overridden = new HashSet<>();
+        final boolean expand;
+
+        Acc(boolean expand) {
+            this.expand = expand;
+        }
+
+        void expand(ZoneId zone, Instant from, Instant to) {
+            for (Master m : masters) {
+                Duration length = m.base.end == null ? null : Duration.between(m.base.start, m.base.end);
+                Instant since = from.minus(length != null ? length : NO_END_GRACE);
+                for (Instant at : m.rule.starts(m.zonedStart, since, to, m.exdates)) {
+                    if (overridden.contains(m.uid + "|" + at.toEpochMilli())) continue;
+                    Instant end = null;
+                    if (m.base.end != null) {
+                        if (m.base.allDay) {
+                            long days = ChronoUnit.DAYS.between(m.base.start.atZone(zone).toLocalDate(),
+                                    m.base.end.atZone(zone).toLocalDate());
+                            end = at.atZone(zone).plusDays(days).toInstant();
+                        } else {
+                            end = at.plus(length);
+                        }
+                    }
+                    Event e = new Event(m.base.title, at, end, m.base.allDay);
+                    if (inWindow(e, from, to)) events.add(e);
+                }
+            }
+        }
+    }
+
+    private static final class Master {
+        final String uid;
+        final Event base;
+        final ZonedDateTime zonedStart;
+        final Recur rule;
+        final List<Instant> exdates;
+
+        Master(String uid, Event base, ZonedDateTime zonedStart, Recur rule, List<Instant> exdates) {
+            this.uid = uid;
+            this.base = base;
+            this.zonedStart = zonedStart;
+            this.rule = rule;
+            this.exdates = exdates;
+        }
     }
 
     /** One unfolded content line. Returns the event being read, if any. */
-    private static Draft take(String line, Deque<String> components, Draft draft, List<Event> out,
+    private static Draft take(String line, Deque<String> components, Draft draft, Acc out,
                               ZoneId zone, Instant from, Instant to) {
         int colon = valueStart(line);
         if (colon < 0) return draft;
@@ -120,8 +187,7 @@ final class Ics {
         if (name.equals("END")) {
             String component = components.isEmpty() ? "" : components.pop();
             if (component.equals("VEVENT") && draft != null) {
-                Event e = draft.finish(zone);
-                if (e != null && inWindow(e, from, to)) out.add(e);
+                draft.collect(zone, from, to, out);
                 return null;
             }
             return draft;
@@ -142,6 +208,19 @@ final class Ics {
                 break;
             case "STATUS":
                 draft.cancelled = value.trim().equalsIgnoreCase("CANCELLED");
+                break;
+            case "UID":
+                draft.uid = value.trim();
+                break;
+            case "RRULE":
+                draft.rrule = value.trim();
+                break;
+            case "EXDATE":
+                draft.exdates.add(new String[] {value.trim(), params});
+                break;
+            case "RECURRENCE-ID":
+                draft.recurrenceId = value.trim();
+                draft.recurrenceParams = params;
                 break;
             default:
                 break;
@@ -185,6 +264,40 @@ final class Ics {
         String start, startParams = "";
         String end, endParams = "";
         boolean cancelled;
+        String uid = "";
+        String rrule;
+        final List<String[]> exdates = new ArrayList<>();
+        String recurrenceId, recurrenceParams = "";
+
+        /** A plain event goes straight in; a repeating one waits for the end of the file; a moved one is noted. */
+        void collect(ZoneId zone, Instant from, Instant to, Acc acc) {
+            if (recurrenceId != null) {
+                try {
+                    acc.overridden.add(uid + "|" + instant(recurrenceId, recurrenceParams, zone).toEpochMilli());
+                } catch (DateTimeException bad) {
+                    // An unreadable RECURRENCE-ID: the moved event still shows, the original may show twice.
+                }
+            }
+            Event e = finish(zone);
+            if (e == null) return;
+            Recur rule = recurrenceId == null && acc.expand ? Recur.parse(rrule) : null;
+            if (rule == null) {
+                if (inWindow(e, from, to)) acc.events.add(e);
+                return;
+            }
+            List<Instant> ex = new ArrayList<>();
+            for (String[] x : exdates) {
+                for (String v : x[0].split(",")) {
+                    try {
+                        ex.add(instant(v.trim(), x[1], zone));
+                    } catch (DateTimeException bad) {
+                        // skip an unreadable EXDATE
+                    }
+                }
+            }
+            ZoneId own = e.allDay ? zone : start.endsWith("Z") || start.endsWith("z") ? ZoneOffset.UTC : tzid(startParams, zone);
+            acc.masters.add(new Master(uid, e, e.start.atZone(own), rule, ex));
+        }
 
         Event finish(ZoneId zone) {
             if (cancelled || start == null) return null;
